@@ -1,5 +1,4 @@
-[app]
-name = "devproof"
+app = "devproof-app"
 primary_region = "iad"
 
 [build]
