@@ -14,6 +14,7 @@ const store = {
 function addLog(entry) {
   store.logs.unshift({ ...entry, timestamp: new Date().toISOString() });
   if (store.logs.length > 50) store.logs.pop();
+  console.log(`[log] ${entry.user} | ${entry.commits} commits | +${entry.reward} DVP`);
 }
 
 module.exports = { store, addLog };
