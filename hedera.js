@@ -16,7 +16,8 @@ let client;
 
 function getClient() {
   if (!client) {
-    client = Client.forTestnet();
+    const network = process.env.HEDERA_NETWORK || "testnet";
+    client = network === "mainnet" ? Client.forMainnet() : Client.forTestnet();
     client.setOperator(
       AccountId.fromString(process.env.HEDERA_ACCOUNT_ID),
       PrivateKey.fromString(process.env.HEDERA_PRIVATE_KEY)
