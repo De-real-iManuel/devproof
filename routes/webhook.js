@@ -42,6 +42,7 @@ router.post("/", async (req, res) => {
   if (commits.length === 0)
     return res.status(400).json({ error: "No commits" });
 
+  console.log(`[webhook] push from ${username} on ${repo} — ${commits.length} commit(s)`);
   const payload = { user: username, repo, commits: commits.length, timestamp: new Date().toISOString() };
   const reward = commits.length * TOKENS_PER_COMMIT;
 
