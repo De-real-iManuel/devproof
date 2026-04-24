@@ -120,6 +120,7 @@
       document.getElementById("walletInfo").style.display = "block";
       document.getElementById("walletAccount").textContent = accountId;
 
+      const githubUser = document.getElementById("githubUserInput").value.trim();
       setStatus("Linking account to DevProof...");
       const res = await fetch("/link", {
         method: "POST",
@@ -152,7 +153,7 @@
         });
 
         const { uri, approval } = await signClient.connect({
-          requiredNamespaces: {
+          optionalNamespaces: {
             hedera: {
               methods: ["hedera_signAndExecuteTransaction"],
               chains: [HEDERA_TESTNET_CHAIN],
