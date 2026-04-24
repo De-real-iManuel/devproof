@@ -15,7 +15,8 @@ router.get("/stats", (req, res) => {
 });
 
 router.get("/logs", (req, res) => {
-  res.json(store.logs);
+  const limit = parseInt(req.query.limit) || 20;
+  res.json(store.logs.slice(0, limit));
 });
 
 // Link GitHub username to Hedera account — creates a dedicated HCS topic for the user
