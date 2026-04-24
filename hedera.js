@@ -39,6 +39,7 @@ async function createUserTopic(username) {
     .execute(getClient());
   const receipt = await tx.getReceipt(getClient());
   const topicId = receipt.topicId.toString();
+  console.log(`[hedera] HCS topic created: ${topicId} for user: ${username}`);
   store.userTopics[username] = topicId;
   return topicId;
 }
