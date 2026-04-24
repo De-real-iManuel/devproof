@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DevProof</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: monospace; max-width: 720px; margin: 40px auto; padding: 0 16px; background: #0d1117; color: #c9d1d9; }
+    h1 { color: #58a6ff; margin-bottom: 4px; }
+    .sub { color: #8b949e; font-size: 0.85rem; margin-bottom: 24px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin: 16px 0; }
+    .card-title { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+    .stat { font-size: 2rem; color: #3fb950; }
+    .meta { font-size: 0.8rem; color: #8b949e; margin-top: 4px; word-break: break-all; }
+    button { background: #238636; color: #fff; border: none; padding: 9px 18px; border-radius: 6px; cursor: pointer; font-family: monospace; font-size: 0.9rem; }
+    button:hover { background: #2ea043; }
+    #connectBtn { background: #1f6feb; }
+    #connectBtn:hover { background: #388bfd; }
+    #walletInfo { display: none; }
+    .badge { display: inline-block; background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; }
+    .green { color: #3fb950; }
+    .red { color: #f85149; }
+    #logs { list-style: none; padding: 0; margin: 0; }
+    #logs li { border-bottom: 1px solid #21262d; padding: 10px 0; font-size: 0.82rem; line-height: 1.5; }
+    #logs li:last-child { border-bottom: none; }
+    .row { display: flex; gap: 16px; }
+    .row .card { flex: 1; }
+    #status { min-height: 1.4em; font-size: 0.85rem; margin-top: 10px; }
+    #qrModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100; align-items:center; justify-content:center; flex-direction:column; }
+    #qrModal.open { display:flex; }
+    #qrBox { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:24px; text-align:center; max-width:340px; }
+    #qrBox canvas { margin: 12px auto; display:block; }
+    #qrUri { font-size:0.65rem; color:#8b949e; word-break:break-all; margin-top:8px; }
+    #closeQr { margin-top:12px; background:#21262d; }
+  </style>
+</head>
+<body>
+  <h1>⛓ DevProof</h1>
+  <div class="sub">Rewarding GitHub commits on Hedera</div>
+
+  <div class="row">
+    <div class="card">
+      <div class="card-title">Total Commits</div>
+      <div class="stat" id="commits">—</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Total Rewards (DVP)</div>
+      <div class="stat" id="rewards">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Network Info</div>
+    <div class="meta">Token ID: <span id="tokenId">—</span></div>
+    <div class="meta">Global Topic: <span id="topicId">—</span></div>
+    <div class="meta">Your Topic: <span id="userTopicId">—</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Wallet</div>
+    <button id="connectBtn">🔗 Connect Wallet</button>
+    <div id="walletInfo">
+      <div style="margin-top:10px">
+        Connected: <span class="badge green" id="walletAccount">—</span>
+        <button id="disconnectBtn" style="margin-left:8px; background:#21262d; font-size:0.75rem; padding:4px 10px;">Disconnect</button>
+      </div>
+      <div class="meta" style="margin-top:6px">Pending rewards: <b id="pendingAmt">0</b> DVP</div>
+      <button id="claimBtn" style="margin-top:10px;">💰 Claim Rewards</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <!-- QR Modal for WalletConnect pairing -->
+  <div id="qrModal">
+    <div id="qrBox">
+      <div style="color:#58a6ff; font-size:1rem; margin-bottom:4px;">Scan with HashPack</div>
+      <div style="color:#8b949e; font-size:0.8rem;">Open HashPack → WalletConnect → Scan</div>
+      <canvas id="qrCanvas"></canvas>
+      <div id="qrUri"></div>
+      <button id="closeQr">Close</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Recent Activity</div>
+    <ul id="logs"><li>Loading...</li></ul>
+  </div>
+
+  <script type="module">
+    import QRCode from "https://esm.sh/qrcode@1.5.3";
+    import SignClient from "https://esm.sh/@walletconnect/sign-client@2";
+
+    const GITHUB_USER = "De-real-iManuel";
+    // Get a free Project ID at https://cloud.walletconnect.com
+    const WC_PROJECT_ID = "a410efc0d43c137138330074a67cdf07";
+
+    const HEDERA_TESTNET_CHAIN = "hedera:testnet";
+
+    let signClient = null;
+    let connectedAccount = null;
+
+    function setStatus(msg, isError = false) {
+      const el = document.getElementById("status");
+      el.textContent = msg;
+      el.style.color = isError ? "#f85149" : "#3fb950";
+    }
+
+    async function refreshPending() {
+      const data = await fetch(`/pending/${GITHUB_USER}`).then(r => r.json());
+      document.getElementById("pendingAmt").textContent = data.pending || 0;
+      if (data.topicId) document.getElementById("userTopicId").textContent = data.topicId;
+    }
+
+    async function onConnected(accountId) {
+      connectedAccount = accountId;
+      document.getElementById("connectBtn").style.display = "none";
+      document.getElementById("walletInfo").style.display = "block";
+      document.getElementById("walletAccount").textContent = accountId;
+
+      setStatus("Linking account to DevProof...");
+      const res = await fetch("/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ githubUser: GITHUB_USER, accountId }),
+      }).then(r => r.json());
+
+      if (res.success) {
+        document.getElementById("userTopicId").textContent = res.topicId || "—";
+        setStatus(`✅ Linked! Your HCS topic: ${res.topicId}`);
+      } else {
+        setStatus(`❌ Link failed: ${res.error}`, true);
+      }
+      await refreshPending();
+    }
+
+    async function connectWallet() {
+      setStatus("Initializing WalletConnect...");
+      try {
+        signClient = await SignClient.init({
+          projectId: WC_PROJECT_ID,
+          metadata: {
+            name: "DevProof",
+            description: "Reward GitHub commits with Hedera tokens",
+            url: window.location.origin,
+            icons: [],
+          },
+        });
+
+        const { uri, approval } = await signClient.connect({
+          requiredNamespaces: {
+            hedera: {
+              methods: ["hedera_signAndExecuteTransaction"],
+              chains: [HEDERA_TESTNET_CHAIN],
+              events: [],
+            },
+          },
+        });
+
+        if (uri) {
+          document.getElementById("qrModal").classList.add("open");
+          document.getElementById("qrUri").textContent = uri;
+          await QRCode.toCanvas(document.getElementById("qrCanvas"), uri, { width: 260, color: { dark: "#c9d1d9", light: "#161b22" } });
+        }
+
+        const session = await approval();
+        document.getElementById("qrModal").classList.remove("open");
+
+        const accounts = session.namespaces?.hedera?.accounts || [];
+        if (!accounts.length) throw new Error("No Hedera account returned");
+
+        // format: "hedera:testnet:0.0.XXXXX"
+        const accountId = accounts[0].split(":")[2];
+        await onConnected(accountId);
+      } catch (err) {
+        document.getElementById("qrModal").classList.remove("open");
+        setStatus(`❌ ${err.message}`, true);
+      }
+    }
+
+    function disconnect() {
+      connectedAccount = null;
+      document.getElementById("connectBtn").style.display = "inline-block";
+      document.getElementById("walletInfo").style.display = "none";
+      document.getElementById("userTopicId").textContent = "—";
+      setStatus("");
+    }
+
+    async function claimRewards() {
+      if (!connectedAccount) return;
+      setStatus("Claiming...");
+      const res = await fetch("/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ githubUser: GITHUB_USER }),
+      }).then(r => r.json());
+
+      if (res.success && res.claimed) {
+        setStatus(`✅ Claimed ${res.claimed} DVP → ${res.accountId}`);
+      } else if (res.message === "Nothing to claim") {
+        setStatus("Nothing to claim yet.");
+      } else {
+        setStatus(`❌ ${res.error}`, true);
+      }
+      await refreshPending();
+    }
+
+    async function loadStats() {
+      const s = await fetch("/stats").then(r => r.json());
+      document.getElementById("commits").textContent = s.totalCommits;
+      document.getElementById("rewards").textContent = s.totalRewards;
+      document.getElementById("tokenId").textContent = s.tokenId || "—";
+      document.getElementById("topicId").textContent = s.topicId || "—";
+    }
+
+    async function loadLogs() {
+      const logs = await fetch("/logs").then(r => r.json());
+      const ul = document.getElementById("logs");
+      if (!logs.length) { ul.innerHTML = "<li>No activity yet.</li>"; return; }
+      ul.innerHTML = logs.map(l =>
+        `<li>📦 <b>${l.user}</b> pushed <b>${l.commits}</b> commit(s) to <b>${l.repo}</b>
+         → <span class="green">+${l.reward} DVP</span>
+         <span style="color:#8b949e; font-size:0.75rem">${l.timestamp}</span>
+         ${l.hederaAccount && l.hederaAccount !== "pending"
+           ? `<br><span class="meta">→ ${l.hederaAccount}</span>`
+           : '<br><span class="red" style="font-size:0.75rem">pending claim</span>'}</li>`
+      ).join("");
+    }
+
+    document.getElementById("connectBtn").addEventListener("click", connectWallet);
+    document.getElementById("disconnectBtn").addEventListener("click", disconnect);
+    document.getElementById("claimBtn").addEventListener("click", claimRewards);
+    document.getElementById("closeQr").addEventListener("click", () => {
+      document.getElementById("qrModal").classList.remove("open");
+      setStatus("Connection cancelled.", true);
+    });
+
+    loadStats();
+    loadLogs();
+    setInterval(() => { loadStats(); loadLogs(); if (connectedAccount) refreshPending(); }, 10000);
+  </script>
+</body>
+</html>
