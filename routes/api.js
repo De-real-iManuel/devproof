@@ -1,79 +1,75 @@
 const express = require("express");
+const db = require("../db");
 const { store } = require("../store");
 const { rewardTokens, createUserTopic } = require("../hedera");
 
 const router = express.Router();
 
 router.get("/stats", (req, res) => {
+  const { totalCommits, totalRewards } = db.getStats();
   res.json({
-    totalCommits: store.totalCommits,
-    totalRewards: store.totalRewards,
+    totalCommits,
+    totalRewards,
     tokenId: store.tokenId,
     topicId: store.topicId,
-    linkedUsers: Object.keys(store.linkedAccounts).length,
   });
 });
 
 router.get("/logs", (req, res) => {
   const limit = parseInt(req.query.limit) || 20;
-  res.json(store.logs.slice(0, limit));
+  res.json(db.getLogs(limit));
 });
 
-// Link GitHub username to Hedera account — creates a dedicated HCS topic for the user
 router.post("/link", async (req, res) => {
   const { githubUser, accountId } = req.body;
   if (!githubUser || !accountId) return res.status(400).json({ error: "githubUser and accountId required" });
   if (!/^0\.0\.\d+$/.test(accountId)) return res.status(400).json({ error: "Invalid Hedera account ID format" });
 
-  store.linkedAccounts[githubUser] = accountId;
+  const existing = db.getLinkedAccount(githubUser);
+  let topicId = existing?.topicId || null;
 
-  // Create a per-user topic if one doesn't exist yet
-  if (!store.userTopics[githubUser]) {
+  if (!topicId) {
     try {
-      await createUserTopic(githubUser);
+      topicId = await createUserTopic(githubUser);
     } catch (err) {
       return res.status(500).json({ error: "Failed to create user topic: " + err.message });
     }
   }
 
-  res.json({
-    success: true,
-    githubUser,
-    accountId,
-    topicId: store.userTopics[githubUser],
-  });
+  db.linkAccount(githubUser, accountId, topicId);
+  res.json({ success: true, githubUser, accountId, topicId });
 });
 
-// Check pending rewards + user topic for a GitHub user
 router.get("/pending/:githubUser", (req, res) => {
   const { githubUser } = req.params;
+  const linked = db.getLinkedAccount(githubUser);
   res.json({
     githubUser,
-    pending: store.pendingRewards[githubUser] || 0,
-    accountId: store.linkedAccounts[githubUser] || null,
-    topicId: store.userTopics[githubUser] || null,
+    pending: db.getPending(githubUser),
+    accountId: linked?.accountId || null,
+    topicId: linked?.topicId || null,
   });
 });
 
-// Claim pending rewards — transfers from treasury to linked account
 router.post("/claim", async (req, res) => {
   const { githubUser, accountId: bodyAccountId } = req.body;
   if (!githubUser) return res.status(400).json({ error: "githubUser required" });
 
-  // Re-link on the fly if store was reset (server restart)
-  if (bodyAccountId && !store.linkedAccounts[githubUser]) {
-    store.linkedAccounts[githubUser] = bodyAccountId;
+  let linked = db.getLinkedAccount(githubUser);
+  if (!linked && bodyAccountId) {
+    db.linkAccount(githubUser, bodyAccountId);
+    linked = { accountId: bodyAccountId };
   }
 
-  const accountId = store.linkedAccounts[githubUser];
+  const accountId = linked?.accountId;
   if (!accountId) return res.status(400).json({ error: "No Hedera account linked. Connect wallet first." });
 
-  const amount = store.pendingRewards[githubUser] || 0;
+  const amount = db.getPending(githubUser);
   if (amount === 0) return res.json({ success: true, message: "Nothing to claim" });
 
   try {
     await rewardTokens(accountId, amount);
-    store.pendingRewards[githubUser] = 0;
+    db.clearPending(githubUser);
     res.json({ success: true, claimed: amount, accountId });
   } catch (err) {
     res.status(500).json({ error: err.message });

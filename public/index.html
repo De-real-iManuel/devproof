@@ -242,7 +242,7 @@
 
     loadStats();
     loadLogs();
-    setInterval(() => { loadStats(); loadLogs(); if (connectedAccount) refreshPending(); }, 10000);
+    setInterval(() => { loadStats(); loadLogs(); if (connectedAccount && document.getElementById("githubUserInput").value.trim()) refreshPending(); }, 10000);
   </script>
 </body>
 </html>

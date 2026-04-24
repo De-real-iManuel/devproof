@@ -1,10 +1,11 @@
 const express = require("express");
 const crypto = require("crypto");
 const { logToHCS, rewardTokens, mintToTreasury } = require("../hedera");
-const { store, addLog } = require("../store");
+const { store } = require("../store");
+const db = require("../db");
 
 const router = express.Router();
-const TOKENS_PER_COMMIT = 10; // 10 DVP per commit
+const TOKENS_PER_COMMIT = 10;
 
 function verifySignature(req) {
   const sig = req.headers["x-hub-signature-256"];
@@ -14,46 +15,38 @@ function verifySignature(req) {
   return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(digest));
 }
 
-async function mintReward(username, hederaAccount, amount) {
-  if (hederaAccount) {
-    await rewardTokens(hederaAccount, amount); // mint + transfer directly
-  } else {
-    await mintToTreasury(amount); // mint to treasury, track as pending
-    store.pendingRewards[username] = (store.pendingRewards[username] || 0) + amount;
-  }
-}
-
 router.post("/", async (req, res) => {
   if (!verifySignature(req)) return res.status(401).json({ error: "Invalid signature" });
 
   const event = req.headers["x-github-event"];
-  if (event !== "push") {
-    console.log(`[webhook] ignored event: ${event}`);
-    return res.status(200).json({ ignored: true });
-  }
+  if (event !== "push") return res.status(200).json({ ignored: true });
 
   const { commits = [], repository, pusher } = req.body;
   const username = pusher?.name;
   const repo = repository?.full_name;
 
   if (!username) return res.status(400).json({ error: "No pusher" });
-
-  if (commits.length === 0)
-    return res.status(400).json({ error: "No commits" });
+  if (commits.length === 0) return res.status(400).json({ error: "No commits" });
 
   console.log(`[webhook] push from ${username} on ${repo} — ${commits.length} commit(s)`);
-  const payload = { user: username, repo, commits: commits.length, timestamp: new Date().toISOString() };
   const reward = commits.length * TOKENS_PER_COMMIT;
-
-  // Look up if this GitHub user has a linked Hedera account
-  const hederaAccount = store.linkedAccounts?.[username];
+  const timestamp = new Date().toISOString();
+  const linked = db.getLinkedAccount(username);
+  const hederaAccount = linked?.accountId || null;
 
   try {
-    await logToHCS(username, payload);
-    await mintReward(username, hederaAccount, reward);
-    store.totalCommits += commits.length;
-    store.totalRewards += reward;
-    addLog({ ...payload, reward, hederaAccount: hederaAccount || "pending" });
+    await logToHCS(username, { user: username, repo, commits: commits.length, timestamp });
+
+    if (hederaAccount) {
+      await rewardTokens(hederaAccount, reward);
+    } else {
+      await mintToTreasury(reward);
+      db.addPending(username, reward);
+    }
+
+    db.incrementStats(commits.length, reward);
+    db.addLog({ user: username, repo, commits: commits.length, reward, hederaAccount, timestamp });
+
     res.json({ success: true, reward, hederaAccount: hederaAccount || "pending" });
   } catch (err) {
     console.error("Hedera error:", err.message);

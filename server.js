@@ -2,10 +2,10 @@ require("dotenv").config();
 const express = require("express");
 const { createTopic, createToken } = require("./hedera");
 const { store } = require("./store");
+const db = require("./db");
 
 const app = express();
 
-// Capture raw body for webhook signature verification
 app.use((req, res, next) => {
   let data = "";
   req.on("data", (chunk) => (data += chunk));
@@ -27,12 +27,28 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 
 (async () => {
-  console.log("Initializing Hedera resources...");
-  store.topicId = await createTopic();
-  console.log("HCS Topic:", store.topicId);
-  store.tokenId = await createToken();
-  console.log("HTS Token:", store.tokenId);
-  console.log(`Allowed user: ${process.env.ALLOWED_GITHUB_USER}`);
+  await db.getDb();
+
+  // Reuse persisted IDs to avoid creating new topic/token on every restart
+  let topicId = db.getHederaId("topicId");
+  let tokenId = db.getHederaId("tokenId");
+
+  if (!topicId) {
+    console.log("Creating HCS topic...");
+    topicId = await createTopic();
+    db.setHederaId("topicId", topicId);
+  }
+
+  if (!tokenId) {
+    console.log("Creating HTS token...");
+    tokenId = await createToken();
+    db.setHederaId("tokenId", tokenId);
+  }
+
+  store.topicId = topicId;
+  store.tokenId = tokenId;
+  console.log("HCS Topic:", topicId);
+  console.log("HTS Token:", tokenId);
 })().catch((err) => {
   console.error("Hedera init failed:", err.message);
   process.exit(1);
