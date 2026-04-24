@@ -1,6 +1,8 @@
 # ⛓ DevProof
 
-Reward GitHub commits with Hedera tokens (DVP).
+> Built on my birthday — April 24, 2026 🎂
+
+Reward GitHub commits with Hedera tokens (DVP). A fun side project that turns coding activity into on-chain proof of work.
 
 ## Stack
 - Node.js + Express
@@ -13,6 +15,9 @@ Reward GitHub commits with Hedera tokens (DVP).
 2. Webhook fires → verified against secret
 3. Activity logged to your personal HCS topic
 4. DVP tokens minted and sent to your Hedera wallet
+
+## Live
+🚀 [devproof-app.fly.dev](https://devproof-app.fly.dev)
 
 ## Setup
 
@@ -27,8 +32,9 @@ npm start
 
 | Variable | Description |
 |---|---|
-| `HEDERA_ACCOUNT_ID` | Your Hedera testnet account |
+| `HEDERA_ACCOUNT_ID` | Your Hedera account |
 | `HEDERA_PRIVATE_KEY` | Your Hedera private key |
+| `HEDERA_NETWORK` | `testnet` or `mainnet` (default: testnet) |
 | `GITHUB_WEBHOOK_SECRET` | Secret set in GitHub webhook settings |
 | `ALLOWED_GITHUB_USER` | GitHub username to accept commits from |
 | `PORT` | Server port (default 8000) |
