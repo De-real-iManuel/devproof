@@ -217,6 +217,10 @@
       document.getElementById("rewards").textContent = s.totalRewards;
       document.getElementById("tokenId").textContent = s.tokenId || "—";
       document.getElementById("topicId").textContent = s.topicId || "—";
+
+      // Auto-load user topic if username is already filled in
+      const githubUser = document.getElementById("githubUserInput").value.trim();
+      if (githubUser) await refreshPending();
     }
 
     async function loadLogs() {

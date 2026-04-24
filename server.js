@@ -1,8 +1,23 @@
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 const express = require("express");
 const { createTopic, createToken } = require("./hedera");
 const { store } = require("./store");
 const db = require("./db");
+
+function persistEnv(key, value) {
+  const envPath = path.join(__dirname, ".env");
+  let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
+  const line = `${key}=${value}`;
+  if (new RegExp(`^${key}=`, "m").test(content)) {
+    content = content.replace(new RegExp(`^${key}=.*`, "m"), line);
+  } else {
+    content = content.trimEnd() + `\n${line}\n`;
+  }
+  fs.writeFileSync(envPath, content);
+  process.env[key] = value;
+}
 
 const app = express();
 
@@ -29,21 +44,27 @@ app.listen(PORT, "0.0.0.0", () => {
 (async () => {
   await db.getDb();
 
-  // Reuse persisted IDs to avoid creating new topic/token on every restart
-  let topicId = db.getHederaId("topicId");
-  let tokenId = db.getHederaId("tokenId");
+  // Prefer env vars, then DB, then create new
+  let topicId = process.env.HEDERA_TOPIC_ID || db.getHederaId("topicId");
+  let tokenId = process.env.HEDERA_TOKEN_ID || db.getHederaId("tokenId");
 
   if (!topicId) {
     console.log("Creating HCS topic...");
     topicId = await createTopic();
     db.setHederaId("topicId", topicId);
+    persistEnv("HEDERA_TOPIC_ID", topicId);
   }
 
   if (!tokenId) {
     console.log("Creating HTS token...");
     tokenId = await createToken();
     db.setHederaId("tokenId", tokenId);
+    persistEnv("HEDERA_TOKEN_ID", tokenId);
   }
+
+  // Sync DB so future restarts skip creation even if .env is missing
+  if (!db.getHederaId("topicId")) db.setHederaId("topicId", topicId);
+  if (!db.getHederaId("tokenId")) db.setHederaId("tokenId", tokenId);
 
   store.topicId = topicId;
   store.tokenId = tokenId;

@@ -70,6 +70,7 @@ router.post("/claim", async (req, res) => {
   try {
     await rewardTokens(accountId, amount);
     db.clearPending(githubUser);
+    db.updateLogAccount(githubUser, accountId);
     res.json({ success: true, claimed: amount, accountId });
   } catch (err) {
     res.status(500).json({ error: err.message });

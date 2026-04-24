@@ -119,6 +119,12 @@ function getLogs(limit = 20) {
   );
 }
 
+function updateLogAccount(githubUser, accountId) {
+  getDb();
+  db.run(`UPDATE logs SET hedera_account = ? WHERE user = ? AND hedera_account = 'pending'`, [accountId, githubUser]);
+  save();
+}
+
 // Stats
 function getStats() {
   getDb();
@@ -147,4 +153,4 @@ function setHederaId(key, value) {
   save();
 }
 
-module.exports = { getDb, linkAccount, getLinkedAccount, updateTopicId, getPending, addPending, clearPending, addLog, getLogs, getStats, incrementStats, getHederaId, setHederaId };
+module.exports = { getDb, linkAccount, getLinkedAccount, updateTopicId, getPending, addPending, clearPending, addLog, getLogs, updateLogAccount, getStats, incrementStats, getHederaId, setHederaId };
