@@ -36,8 +36,7 @@ router.post("/", async (req, res) => {
   const username = pusher?.name;
   const repo = repository?.full_name;
 
-  if (username !== process.env.ALLOWED_GITHUB_USER)
-    return res.status(403).json({ error: "User not allowed" });
+  if (!username) return res.status(400).json({ error: "No pusher" });
 
   if (commits.length === 0)
     return res.status(400).json({ error: "No commits" });

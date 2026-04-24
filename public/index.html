@@ -58,6 +58,9 @@
 
   <div class="card">
     <div class="card-title">Wallet</div>
+    <div style="margin-bottom:10px">
+      <input id="githubUserInput" type="text" placeholder="Your GitHub username" style="background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:8px 12px; border-radius:6px; font-family:monospace; font-size:0.9rem; width:220px;" />
+    </div>
     <button id="connectBtn">🔗 Connect Wallet</button>
     <div id="walletInfo">
       <div style="margin-top:10px">
@@ -90,8 +93,6 @@
     import QRCode from "https://esm.sh/qrcode@1.5.3";
     import SignClient from "https://esm.sh/@walletconnect/sign-client@2";
 
-    const GITHUB_USER = "De-real-iManuel";
-    // Get a free Project ID at https://cloud.walletconnect.com
     const WC_PROJECT_ID = "a410efc0d43c137138330074a67cdf07";
 
     const HEDERA_TESTNET_CHAIN = "hedera:testnet";
@@ -106,7 +107,9 @@
     }
 
     async function refreshPending() {
-      const data = await fetch(`/pending/${GITHUB_USER}`).then(r => r.json());
+      const githubUser = document.getElementById("githubUserInput").value.trim();
+      if (!githubUser) return;
+      const data = await fetch(`/pending/${githubUser}`).then(r => r.json());
       document.getElementById("pendingAmt").textContent = data.pending || 0;
       if (data.topicId) document.getElementById("userTopicId").textContent = data.topicId;
     }
@@ -121,7 +124,7 @@
       const res = await fetch("/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ githubUser: GITHUB_USER, accountId }),
+        body: JSON.stringify({ githubUser, accountId }),
       }).then(r => r.json());
 
       if (res.success) {
@@ -134,6 +137,8 @@
     }
 
     async function connectWallet() {
+      const githubUser = document.getElementById("githubUserInput").value.trim();
+      if (!githubUser) return setStatus("Enter your GitHub username first.", true);
       setStatus("Initializing WalletConnect...");
       try {
         signClient = await SignClient.init({
@@ -186,12 +191,13 @@
     }
 
     async function claimRewards() {
-      if (!connectedAccount) return;
+      const githubUser = document.getElementById("githubUserInput").value.trim();
+      if (!connectedAccount || !githubUser) return;
       setStatus("Claiming...");
       const res = await fetch("/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ githubUser: GITHUB_USER, accountId: connectedAccount }),
+        body: JSON.stringify({ githubUser, accountId: connectedAccount }),
       }).then(r => r.json());
 
       if (res.success && res.claimed) {
