@@ -1,4 +1,5 @@
 // In-memory store — persists for the lifetime of the process
+// Reset on server restart; Hedera HCS is the permanent record
 const store = {
   totalCommits: 0,
   totalRewards: 0,
