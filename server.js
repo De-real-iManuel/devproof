@@ -18,6 +18,7 @@ app.use((req, res, next) => {
 
 app.use(express.static("public"));
 app.use("/webhook", require("./routes/webhook"));
+app.use("/", require("./routes/health"));
 app.use("/", require("./routes/api"));
 
 async function init() {
