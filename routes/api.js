@@ -23,6 +23,7 @@ router.get("/logs", (req, res) => {
 router.post("/link", async (req, res) => {
   const { githubUser, accountId } = req.body;
   if (!githubUser || !accountId) return res.status(400).json({ error: "githubUser and accountId required" });
+  if (!/^0\.0\.\d+$/.test(accountId)) return res.status(400).json({ error: "Invalid Hedera account ID format" });
 
   store.linkedAccounts[githubUser] = accountId;
 
