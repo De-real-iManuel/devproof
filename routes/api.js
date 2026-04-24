@@ -10,6 +10,7 @@ router.get("/stats", (req, res) => {
     totalRewards: store.totalRewards,
     tokenId: store.tokenId,
     topicId: store.topicId,
+    linkedUsers: Object.keys(store.linkedAccounts).length,
   });
 });
 
