@@ -28,7 +28,12 @@ async function init() {
   console.log("HTS Token:", store.tokenId);
 
   const PORT = process.env.PORT || 8000;
-  app.listen(PORT, () => console.log(`DevProof running on http://localhost:${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`DevProof running on http://localhost:${PORT}`);
+    console.log(`HCS Topic: ${store.topicId}`);
+    console.log(`HTS Token: ${store.tokenId}`);
+    console.log(`Allowed user: ${process.env.ALLOWED_GITHUB_USER}`);
+  });
 }
 
 init().catch((err) => {
