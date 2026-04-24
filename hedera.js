@@ -26,7 +26,9 @@ function getClient() {
 }
 
 async function createTopic() {
-  const tx = await new TopicCreateTransaction().execute(getClient());
+  const tx = await new TopicCreateTransaction()
+    .setTopicMemo("DevProof:global")
+    .execute(getClient());
   const receipt = await tx.getReceipt(getClient());
   return receipt.topicId.toString();
 }
