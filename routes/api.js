@@ -57,8 +57,13 @@ router.get("/pending/:githubUser", (req, res) => {
 
 // Claim pending rewards — transfers from treasury to linked account
 router.post("/claim", async (req, res) => {
-  const { githubUser } = req.body;
+  const { githubUser, accountId: bodyAccountId } = req.body;
   if (!githubUser) return res.status(400).json({ error: "githubUser required" });
+
+  // Re-link on the fly if store was reset (server restart)
+  if (bodyAccountId && !store.linkedAccounts[githubUser]) {
+    store.linkedAccounts[githubUser] = bodyAccountId;
+  }
 
   const accountId = store.linkedAccounts[githubUser];
   if (!accountId) return res.status(400).json({ error: "No Hedera account linked. Connect wallet first." });

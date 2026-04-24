@@ -191,7 +191,7 @@
       const res = await fetch("/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ githubUser: GITHUB_USER }),
+        body: JSON.stringify({ githubUser: GITHUB_USER, accountId: connectedAccount }),
       }).then(r => r.json());
 
       if (res.success && res.claimed) {
