@@ -27,7 +27,10 @@ router.post("/", async (req, res) => {
   if (!verifySignature(req)) return res.status(401).json({ error: "Invalid signature" });
 
   const event = req.headers["x-github-event"];
-  if (event !== "push") return res.status(200).json({ ignored: true });
+  if (event !== "push") {
+    console.log(`[webhook] ignored event: ${event}`);
+    return res.status(200).json({ ignored: true });
+  }
 
   const { commits = [], repository, pusher } = req.body;
   const username = pusher?.name;
